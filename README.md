@@ -89,12 +89,58 @@ NOTE : When using pytorch optimizer fintuning for 3 epochs took about 16 hours w
 
 The trained weights are available on [HuggingFace](https://huggingface.co/tomrb/bettercallbloom-3b).
 
+# Deploying the model with Huggingface Spaces and Gradio 
+To build a quick interface to interact with the model, Thomas used Gradio and hosted the model on HuggingFace Spaces using a cheap CPU upgrade so that the model would fit on RAM memory.
+```
+tokenizer = BloomTokenizerFast.from_pretrained("tomrb/bettercallbloom-3b")
+model = BloomForCausalLM.from_pretrained("tomrb/bettercallbloom-3b",low_cpu_mem_usage=True)
+
+generator = pipeline('text-generation', model=model, tokenizer=tokenizer,do_sample=False)
 
 
+def preprocess(text):
+    #We add 'Question :' and 'Answer #1:' at the start and end of the prompt
+    return "\nQuestion: " + text + "\nAnswer #1:"
 
 
+def generate(text):
+    
+    preprocessed_text = preprocess(text)
+    result = generator(preprocessed_text, max_length=128)
+    output = re.split(r'\nQuestion:|Answer #1:|Answer #|Title:',result[0]['generated_text'])[2]
+    
+    return output
+```
+the preprocess function will add a "\nQuestion: " in front of the input question and add a "\nAnswer #1:" at the end. This keeps the model from trying to continue the question and prompts it to generate an answer immediately.
+
+```
+with gr.Blocks() as demo:
+
+  input_text = gr.Textbox(label="Input", lines=6)  
+  buton = gr.Button("Submit ")  
+  output_text = gr.Textbox(lines=6, label="Output")
+  buton.click(generate, inputs=[input_text], outputs=output_text)  
+
+demo.launch(enable_queue=True, debug=True)
+```
+
+And voilà! We now have a finetuned version of BLOOM-3B on the r/legal_advice sub-dataset of PileOfLaw that is hosted with a public frontend on HuggingFace spaces. Pretty neat!
+
+# Qualitative Performance of the Finetuned Model
+
+### Example 1 :
+<div>
+<img src="https://miro.medium.com/v2/resize:fit:828/format:webp/1*_PEO7-iPhHLHbF7H8QxMZQ.png">
+<div>
 
 
+### Example 2 :
+<div>
+<img src="https://miro.medium.com/v2/resize:fit:828/format:webp/1*pT7F8VOkIfLY1vrM8jatrw.png">
+<div>
 
-
+### Example 3 :
+<div>
+<img src="https://miro.medium.com/v2/resize:fit:828/format:webp/1*SPVfYw33pPBQSHmpEnhq2Q.png">
+<div>
 
